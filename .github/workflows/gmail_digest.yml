@@ -1,0 +1,45 @@
+# .github/workflows/gmail_digest.yml
+name: Gmail → Slack ダイジェスト (毎朝9時JST)
+
+
+on:
+schedule:
+# GitHub Actions は UTC 実行。JST 9:00 は UTC 0:00
+- cron: '0 0 * * *'
+workflow_dispatch: {}
+
+
+permissions:
+contents: read
+issues: read
+
+
+jobs:
+run-digest:
+runs-on: ubuntu-latest
+steps:
+- name: Checkout
+uses: actions/checkout@v4
+
+
+- name: Run Claude Code with MCP
+uses: anthropics/claude-code-action@v1
+env:
+ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+SLACK_USER_TOKEN: ${{ secrets.SLACK_USER_TOKEN }}
+SLACK_BOT_TOKEN: ${{ secrets.SLACK_USER_TOKEN }} # 互換: 一部のSlack MCPは環境変数名を固定参照
+with:
+mcp_config_path: ./.mcp.json
+prompt_path: ./prompts/digest.prompt.md
+model: claude-3-7-sonnet
+max_output_tokens: 4000
+
+
+## User Token を使うための注意
+- スコープ目安: `chat:write`, `im:write`, `users:read`。DMに送る場合は `conversations.open` でチャネルIDを取得するか、既知の `D********` を使います。
+- `@modelcontextprotocol/server-slack` は通常 `SLACK_BOT_TOKEN` 環境変数名を参照する実装が多いため、ワークフローでは **互換目的で同値をエクスポート** しています（`SLACK_BOT_TOKEN=${{ secrets.SLACK_USER_TOKEN }}`）。
+- `chat.postMessage` は User Token でも利用でき、投稿者は「あなた本人」名義になります。必要スコープは Slack 公式ドキュメント（`chat:write` など）を参照してください。
+
